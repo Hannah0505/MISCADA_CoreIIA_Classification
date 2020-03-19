@@ -1,0 +1,101 @@
+---
+title: "Classification with R Machine Learning"
+output: pdf_document
+---
+
+load data
+```{r}
+library(tidyverse)
+library(reshape2)
+houseData = read.csv('../data/housing.csv')
+head(houseData)
+```
+
+```{r}
+library(ggplot2)
+ggplot(data = melt(houseData), mapping = aes(x = value)) + geom_histogram(bins = 30) + facet_wrap(~variable, scales = 'free_x')
+```
+
+explor missing data
+```{r}
+summary(houseData)
+```
+
+fill missing data with column mean value
+```{r}
+houseData$latitude[is.na(houseData$latitude)] = mean(houseData$latitude, na.rm = TRUE)
+houseData$housing_median_age[is.na(houseData$housing_median_age)] = median(houseData$housing_median_age, na.rm = TRUE)
+houseData$total_rooms[is.na(houseData$total_rooms)] = median(houseData$total_rooms, na.rm = TRUE)
+houseData$total_bedrooms[is.na(houseData$total_bedrooms)] = median(houseData$total_bedrooms, na.rm = TRUE)
+houseData$population[is.na(houseData$population)] = median(houseData$population, na.rm = TRUE)
+houseData$households[is.na(houseData$households)] = median(houseData$households, na.rm = TRUE)
+houseData$median_income[is.na(houseData$median_income)] = median(houseData$median_income, na.rm = TRUE)
+houseData$median_house_value[is.na(houseData$median_house_value)] = median(houseData$median_house_value, na.rm = TRUE)
+summary(houseData)
+```
+
+feature engineering
+```{r}
+target = c('ocean_proximity') # set ocean_proximity as the target
+houseDataX = houseData[, 1: 9]
+houseDataX = scale(houseDataX)
+houseDataY = houseData[target]
+
+# numeric the target column
+houseDataY = as.numeric(as.factor(houseDataY$ocean_proximity))
+houseDataY = matrix(houseDataY, ncol = 1)
+```
+
+split into training and testing data set
+```{r}
+data = cbind(houseDataX, houseDataY)
+colnames(data) = c(colnames(data)[1: 9], 'target')
+
+# split
+set.seed(1)
+rows = nrow(data)
+# set ratio of training:testing = 3: 1
+sample = sample.int(n = rows, size = round(0.75 * rows), replace = F)
+trainingData = data[sample, ]
+testingData = data[-sample, ]
+paste('after sampling, the ratio of traing : testing is: ', nrow(trainingData) %/% nrow(testingData))
+```
+
+build model1 DecisionTree
+```{r}
+library(rpart)
+trainingData = as.data.frame(trainingData)
+testingData = as.data.frame(testingData)
+testingTarget = testingData$target
+testingData = testingData[, 1: ncol(testingData) - 1]
+tree = rpart(target~., data = trainingData)
+summary(tree)
+```
+
+```{r}
+
+plot(tree, margin=0.5)
+text(tree, cex=0.6)
+```
+
+build model2 RandomForest
+```{r}
+library(randomForest)
+rm = randomForest(target~., data = trainingData)
+
+importance(rm)
+```
+
+predition and evaluation
+```{r}
+library(ROCR)
+pre = predict(tree, testingData)
+print('Accuracy using Decision Tree:')
+print(sum(pre == testingTarget) / length(testingTarget))
+
+pre = predict(rm, testingData)
+print('Accuracy using Random Forest:')
+print(sum(pre == testingTarget) / length(testingTarget))
+
+```
+
